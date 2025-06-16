@@ -1,17 +1,24 @@
 import random
-import time
-import os
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
 
-def turing_machine(tape_string):
+def instantaneous_description(state, tape, head):
+    left = ''.join(tape[:head])
+    right = ''.join(tape[head:])
+    return f"{left} q{state} {right}"
+
+
+def turing_machine(tape_string, max_length=1000):
+    if len(tape_string) > max_length:
+        raise ValueError(
+            f"Input exceeds maximum allowed length of {max_length}.")
+
     tape = list(tape_string)
     tape.append('B')
 
     head = 0
-    state = 'q0'
-
+    state = '0'
     steps = []
 
     while True:
@@ -19,60 +26,58 @@ def turing_machine(tape_string):
         steps.append((state, tape.copy(), head))
 
         match (state, symbol):
-            case ('q0', '0'):
+            case ('0', '0'):
                 tape[head] = 'X'
                 head += 1
-                state = 'q1'
-
-            case ('q0', 'Y'):
+                state = '1'
+            case ('0', 'Y'):
                 head += 1
-                state = 'q3'
-
-            case ('q1', '0') | ('q1', 'Y'):
+                state = '3'
+            case ('1', '0') | ('1', 'Y'):
                 head += 1
-
-            case ('q1', '1'):
+            case ('1', '1'):
                 tape[head] = 'Y'
                 head -= 1
-                state = 'q2'
-
-            case ('q2', '0') | ('q2', 'Y'):
+                state = '2'
+            case ('2', '0') | ('2', 'Y'):
                 head -= 1
-
-            case ('q2', 'X'):
+            case ('2', 'X'):
                 head += 1
-                state = 'q0'
-
-            case ('q3', 'Y'):
+                state = '0'
+            case ('3', 'Y'):
                 head += 1
-
-            case ('q3', 'B'):
+            case ('3', 'B'):
+                steps.append(('ACCEPT', tape.copy(), head))
                 return True, steps
-
             case _:
+                steps.append(('REJECT', tape.copy(), head))
                 return False, steps
 
 
-def generate_random_string():
-    n = random.randint(1, 5)
+def generate_random_string(max_length=1000):
+    n = random.randint(1, min(10, max_length // 2))
     valid = random.choice([True, False])
     if valid:
         return '0' * n + '1' * n
     else:
-        m = random.randint(0, 5)
+        m = random.randint(0, max_length - n)
         return '0' * n + '1' * m
+
+
+def write_steps_to_file(steps, filename='output.txt'):
+    with open(filename, 'w') as f:
+        for state, tape, head in steps:
+            f.write(instantaneous_description(state, tape, head) + '\n')
 
 
 def animate_steps(steps, accepted):
     tape_length = len(steps[0][1])
-    fig, ax = plt.subplots(figsize=(tape_length, 3))
+    fig, ax = plt.subplots(figsize=(max(8, tape_length), 3))
     ax.set_xlim(0, tape_length)
     ax.set_ylim(0, 3)
     ax.axis('off')
 
-    boxes = []
-    symbols = []
-    arrows = []
+    boxes, symbols, arrows = [], [], []
     state_box = plt.Rectangle(
         (tape_length // 2 - 1, 2.4), 2, 0.4, facecolor='#cce5ff', edgecolor='black')
     ax.add_patch(state_box)
@@ -99,17 +104,13 @@ def animate_steps(steps, accepted):
     def update(frame):
         state, tape, head = steps[frame]
         state_label.set_text(f"State: {state}")
-
         for i in range(tape_length):
             symbols[i].set_text(tape[i])
             arrows[i].set_text('↑' if i == head else '')
             boxes[i].set_facecolor('#FFDDC1' if i == head else 'white')
-
         if frame == len(steps) - 1:
-            if accepted:
-                result_message.set_text("STRING ACCEPTED")
-            else:
-                result_message.set_text("STRING REJECTED")
+            result_message.set_text(
+                "STRING ACCEPTED" if accepted else "STRING REJECTED")
 
     anim = FuncAnimation(fig, update, frames=len(steps),
                          interval=800, repeat=False)
@@ -123,7 +124,7 @@ def main():
     option = input("Choose an option (1 or 2): ")
 
     if option == '1':
-        tape_input = input("Enter a binary string (like 0011): ")
+        tape_input = input("Enter a binary string (max 1000 characters): ")
     elif option == '2':
         tape_input = generate_random_string()
         print(f"Generated string: {tape_input}")
@@ -131,9 +132,17 @@ def main():
         print("Invalid option.")
         return
 
-    accepted, steps = turing_machine(tape_input)
+    if len(tape_input) > 1000:
+        print("Input too long.")
+        return
 
-    animate_steps(steps, accepted)
+    accepted, steps = turing_machine(tape_input)
+    write_steps_to_file(steps)
+
+    if len(tape_input) <= 10:
+        animate_steps(steps, accepted)
+    else:
+        print("Animation skipped due to input length. See output.txt for full computation trace.")
 
 
 if __name__ == "__main__":

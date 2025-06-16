@@ -1,0 +1,6 @@
+ q0 01B
+X q1 1B
+ q2 XYB
+X q0 YB
+XY q3 B
+XY qACCEPT B
